@@ -1,0 +1,41 @@
+# Profile normalization (Part F): the live SAS4 instance has roughly 47
+# chaotic profile-name variants that collapse to ~8 real tiers. This file is
+# a PLACEHOLDER STRUCTURE, not real data — this session has no access to the
+# live instance's actual profile_details.name values, so the entries below
+# are illustrative shapes for the mapping format, not the real 47->8
+# collapse. Before running the import for real:
+#   1. Pull the distinct profile_details.name values from the live instance
+#      (`SELECT DISTINCT name FROM sas_profiles` per Part F's known mirror
+#      tables, or via index/profile if that route exists — verify).
+#   2. Fill in `legacy_name_patterns` for each of the real ~8 tiers below,
+#      reviewing with whoever knows why 47 names exist (most are probably
+#      historical renames/typos of the same underlying tier).
+#   3. Anything that doesn't match a pattern below fails the import loudly
+#      (see run_import.py) rather than silently defaulting to some tier —
+#      an unmapped profile is a data question for a human, not something to
+#      guess.
+
+tiers:
+  - normalized_name: "basic-10m"
+    rx_limit_bps: 10_000_000
+    tx_limit_bps: 10_000_000
+    legacy_name_patterns:
+      - "^10M.*$"
+      - "^Basic.?10.*$"
+
+  - normalized_name: "standard-20m"
+    rx_limit_bps: 20_000_000
+    tx_limit_bps: 20_000_000
+    legacy_name_patterns:
+      - "^20M.*$"
+      - "^Standard.?20.*$"
+
+  - normalized_name: "premium-50m"
+    rx_limit_bps: 50_000_000
+    tx_limit_bps: 50_000_000
+    legacy_name_patterns:
+      - "^50M.*$"
+      - "^Premium.*$"
+
+  # ... remaining ~5 tiers to be filled in from the live instance's actual
+  # profile_details.name distribution before the import is run for real.

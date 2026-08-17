@@ -27,13 +27,20 @@ dev = [
     "ruff>=0.7",
     "pyrad>=2.4",  # RADIUS wire-protocol client, for the docker-based FreeRADIUS integration test
 ]
+# One-time legacy import (Part F), flag-gated and quarantined after cutover —
+# kept out of the base dependency set so a normal `pip install .` for the
+# running platform never pulls in the AES envelope / legacy-API-client code
+# path at all.
+import-legacy = [
+    "pycryptodome>=3.20",  # OpenSSL/CryptoJS-compatible AES envelope, see import_legacy/crypto.py
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["tests", "import_legacy/tests"]
 
 [tool.ruff]
 line-length = 100
 
 [tool.setuptools]
-packages = ["app"]
+packages = ["app", "import_legacy"]
