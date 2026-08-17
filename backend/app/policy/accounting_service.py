@@ -49,10 +49,18 @@ async def record_accounting(
     ).scalar_one_or_none()
 
     if session_row is None:
+        # last_input_octets/last_output_octets/last_session_time_s are passed
+        # explicitly rather than left to their column default=0: a column
+        # default only applies at flush/INSERT time, but the delta
+        # computation just below reads these attributes on the in-memory
+        # object immediately after construction, before any flush happens.
         session_row = RadiusSession(
             acct_session_id=acct_session_id,
             subscriber_id=subscriber.id,
             nas_ip=nas_ip,
+            last_input_octets=0,
+            last_output_octets=0,
+            last_session_time_s=0,
             updated_at=now,
         )
         db.add(session_row)

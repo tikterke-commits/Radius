@@ -25,6 +25,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "freezegun>=1.5",
     "ruff>=0.7",
+    "pyrad>=2.4",  # RADIUS wire-protocol client, for the docker-based FreeRADIUS integration test
 ]
 
 [tool.pytest.ini_options]
