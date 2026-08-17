@@ -1,0 +1,68 @@
+# Virtual server: PPPoE/PAP-only (A5), policy computed entirely by the
+# platform backend over rlm_rest (A1) — no unlang policy logic here beyond
+# routing based on the module's rcode.
+
+listen {
+	type = auth
+	ipaddr = *
+	port = 1812
+}
+
+listen {
+	type = acct
+	ipaddr = *
+	port = 1813
+}
+
+server default {
+
+authorize {
+	filter_username
+
+	rest
+	if (ok || updated) {
+		# Route authentication to our own PAP-over-REST check (app's
+		# Argon2id verify) instead of FreeRADIUS's built-in pap module,
+		# which would need Cleartext-Password/NT-Password in `control:` —
+		# exactly what A5 decided not to store.
+		update control {
+			Auth-Type := rest
+		}
+	}
+	elsif (notfound) {
+		reject
+	}
+	elsif (fail) {
+		# The backend's own authorize_with_budget() already resolves
+		# fail-open/fail-closed *inside* its timeout budget (see
+		# backend/app/policy/decision_cache.py) — a bare `fail` here means
+		# the HTTP call itself didn't get a response at all (backend
+		# process down, not just slow), which is a deeper failure than
+		# the fail-mode config is meant to paper over. Reject rather than
+		# silently pass every subscriber through with no rate limit.
+		reject
+	}
+}
+
+authenticate {
+	Auth-Type rest {
+		rest
+	}
+}
+
+preacct {
+	preprocess
+}
+
+accounting {
+	rest
+}
+
+post-auth {
+	rest
+	Post-Auth-Type REJECT {
+		rest
+	}
+}
+
+}

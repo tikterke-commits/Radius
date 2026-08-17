@@ -1,0 +1,8 @@
+# Site-local dictionary additions. The stock /etc/freeradius/3.0/dictionary
+# already $INCLUDEs this file by FreeRADIUS packaging convention.
+#
+# MikroTik-Rate-Limit, MikroTik-Address-List etc. ship in FreeRADIUS's own
+# dictionary.mikrotik — included explicitly here rather than assumed, since
+# whether it's pulled in by default varies by how the base image's top-level
+# dictionary file was assembled.
+$INCLUDE dictionary.mikrotik

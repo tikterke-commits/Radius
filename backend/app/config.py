@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     authz_fail_mode: AuthzFailMode = AuthzFailMode.CLOSED
     authz_backend_timeout_ms: int = 40  # leaves headroom under the 50ms p99 budget
     authz_decision_cache_ttl_s: int = 30
+    # A bare fail-open grant with no reply attributes means an *uncapped* pipe
+    # for however long the backend stays unreachable — not just "access
+    # continues," but "every plan's speed ceiling disappears at once" during
+    # exactly the kind of incident where the network is already stressed.
+    # Applied only when fail-open triggers with no cached decision to fall
+    # back on (see app/api/radius.py).
+    authz_fail_open_default_rate_bps: int = 5_000_000  # conservative floor, not a plan's real rate
 
     jwt_secret: str = "change-me-in-.env"
     jwt_algorithm: str = "HS256"

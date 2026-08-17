@@ -1,0 +1,58 @@
+# rlm_rest wiring for authorize/authenticate/accounting/post-auth into the
+# platform backend, per A1. Response contract verified against rlm_rest's
+# own documented behavior (not assumed):
+#   - authorize/authenticate: 2xx -> ok/updated (body processed),
+#     401 -> reject (body still processed), 5xx -> fail
+#   - accounting/post-auth: 204/2xx -> ok, 5xx -> fail
+#   - JSON response keys need an explicit list prefix: "reply:Attribute-Name"
+# See backend/app/schemas/radius.py and backend/app/api/radius.py for the
+# Python side of this exact contract.
+
+rest {
+	connect_uri = "${env.RLM_REST_BASE_URL}"
+
+	connect_timeout = 0.030  # seconds; leaves headroom under the 50ms p99
+	                          # authorize budget alongside the backend's own
+	                          # internal timeout (app/config.py authz_backend_timeout_ms)
+
+	tls {
+		# Internal network call, backend and freeradius are docker-compose
+		# siblings on the same host — plain HTTP for now. Revisit if the
+		# backend ever moves off-box from the RADIUS server.
+	}
+
+	authorize {
+		uri = "${..connect_uri}/radius/authorize"
+		method = 'post'
+		body = 'json'
+		data = '{"username":"%{User-Name}","nas_ip_address":"%{NAS-IP-Address}","nas_port_id":"%{NAS-Port-Id}","calling_station_id":"%{Calling-Station-Id}"}'
+		tls = ${..tls}
+	}
+
+	authenticate {
+		uri = "${..connect_uri}/radius/authenticate"
+		method = 'post'
+		body = 'json'
+		# PAP only (A5): User-Password here is the cleartext PAP password
+		# FreeRADIUS decoded from the RFC 2865 shared-secret-obfuscated wire
+		# format. Never logged by this module or the backend.
+		data = '{"username":"%{User-Name}","password":"%{User-Password}"}'
+		tls = ${..tls}
+	}
+
+	accounting {
+		uri = "${..connect_uri}/radius/accounting"
+		method = 'post'
+		body = 'json'
+		data = '{"username":"%{User-Name}","acct_status_type":"%{Acct-Status-Type}","acct_session_id":"%{Acct-Session-Id}","nas_ip_address":"%{NAS-IP-Address}","acct_session_time":%{%{Acct-Session-Time}:-0},"acct_input_octets":%{%{Acct-Input-Octets}:-0},"acct_output_octets":%{%{Acct-Output-Octets}:-0},"acct_terminate_cause":"%{Acct-Terminate-Cause}"}'
+		tls = ${..tls}
+	}
+
+	post-auth {
+		uri = "${..connect_uri}/radius/post-auth"
+		method = 'post'
+		body = 'json'
+		data = '{"username":"%{User-Name}","packet_type":"%{Packet-Type}","nas_ip_address":"%{NAS-IP-Address}"}'
+		tls = ${..tls}
+	}
+}

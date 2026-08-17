@@ -9,6 +9,7 @@ from app.models import (  # noqa: F401
     quota,
     radius_fallback,
     rbac,
+    session,
     subscriber,
     tenant,
 )

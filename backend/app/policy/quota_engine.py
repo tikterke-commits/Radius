@@ -43,10 +43,10 @@ class QuotaLedger:
         return value is not None and value <= 0
 
     def _get(self, kind: QuotaKind, period: QuotaPeriod) -> int | None:
-        return getattr(self, _field_name(kind, period))
+        return getattr(self, quota_field_name(kind, period))
 
 
-def _field_name(kind: QuotaKind, period: QuotaPeriod) -> str:
+def quota_field_name(kind: QuotaKind, period: QuotaPeriod) -> str:
     if kind == QuotaKind.UPTIME:
         return "uptime_monthly_s" if period == QuotaPeriod.MONTHLY else "uptime_daily_s"
     return f"{kind.value}_{period.value}"

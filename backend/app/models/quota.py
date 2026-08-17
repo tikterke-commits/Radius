@@ -1,4 +1,3 @@
-import enum
 import uuid
 from datetime import datetime
 
@@ -6,20 +5,12 @@ from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-
 from app.db import Base
-
-
-class QuotaKind(str, enum.Enum):
-    RX = "rx"
-    TX = "tx"
-    RXTX = "rxtx"
-    UPTIME = "uptime"
-
-
-class QuotaPeriod(str, enum.Enum):
-    MONTHLY = "monthly"
-    DAILY = "daily"
+# QuotaKind/QuotaPeriod live in the pure policy layer (app.policy.quota_engine)
+# and are re-exported here rather than redefined, so the DB schema and the
+# quota-decrement logic can never drift into two different ideas of what
+# "rx daily" means.
+from app.policy.quota_engine import QuotaKind, QuotaPeriod  # noqa: F401
 
 
 class QuotaState(Base):

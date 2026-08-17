@@ -86,14 +86,20 @@ services:
     environment:
       RLM_REST_BASE_URL: http://backend:8000
     volumes:
-      - ./radius/mods-config:/etc/freeradius/3.0/mods-config:ro
+      # Bind-mounted for fast dev iteration; the Dockerfile also COPYs these
+      # so a plain `docker compose build` (no mounts) still produces a
+      # correctly configured image for non-compose deployment.
       - ./radius/sites-enabled:/etc/freeradius/3.0/sites-enabled:ro
+      - ./radius/mods-enabled/rest:/etc/freeradius/3.0/mods-enabled/rest:ro
     depends_on:
       - backend
     ports:
       - "1812:1812/udp"
       - "1813:1813/udp"
-      - "3799:3799/udp"  # CoA / Disconnect-Request
+      # No CoA listener here: this server originates CoA/Disconnect-Requests
+      # toward the NAS fleet (RouterOS actuation layer, B4 — not yet built),
+      # it doesn't receive them, so there's no `listen { type = coa }` block
+      # and nothing needs port 3799 published on this service.
 
   caddy:
     image: caddy:2-alpine
