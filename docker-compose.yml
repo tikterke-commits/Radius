@@ -1,0 +1,114 @@
+version: "3.8"
+
+# Data Plus Lebanon ISP platform.
+# NOTE: this compose file is meant to be run on the actual deploy host
+# (Proxmox/LXC, HP DL380 Gen9). It has not been run from this build session —
+# there is no docker daemon and no network path to production reachable here.
+# Bring it up with: docker compose up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-radius_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-radius}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-radius}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: radius_telemetry
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-radius}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set in .env}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./backend/clickhouse:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-radius}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:-radius_platform}
+      REDIS_URL: redis://redis:6379/0
+      CLICKHOUSE_URL: http://clickhouse:8123
+      AUTHZ_FAIL_MODE: ${AUTHZ_FAIL_MODE:-closed}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  freeradius:
+    build: ./radius
+    restart: unless-stopped
+    environment:
+      RLM_REST_BASE_URL: http://backend:8000
+    volumes:
+      - ./radius/mods-config:/etc/freeradius/3.0/mods-config:ro
+      - ./radius/sites-enabled:/etc/freeradius/3.0/sites-enabled:ro
+    depends_on:
+      - backend
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+      - "3799:3799/udp"  # CoA / Disconnect-Request
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  clickhouse_data:
+  caddy_data:
