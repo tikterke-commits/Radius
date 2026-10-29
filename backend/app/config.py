@@ -46,5 +46,52 @@ class Settings(BaseSettings):
 
     import_enabled: bool = False  # Part F: flag-gated, off after cutover
 
+    # --- Policy clock -----------------------------------------------------
+    # Every time-of-day window, free-hours window and daily reset is local
+    # time. RADIUS timestamps are UTC; policy evaluation converts first.
+    timezone: str = "Asia/Beirut"
+    daily_reset_time: str = "00:00"  # local HH:MM when daily quotas/usage roll over
+
+    # --- Admin API (consumed by Atlas) ------------------------------------
+    # Empty = admin API disabled (every /api/v1 call returns 503). Atlas holds
+    # this key; RBAC for humans lives in Atlas, the engine trusts the key and
+    # records the X-Actor header in the audit log.
+    admin_api_key: str = ""
+    default_tenant_name: str = "Data Plus Lebanon"
+
+    # Fernet key for NAS shared secrets at rest. Generate with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    nas_secret_key: str = ""
+    # Where the backend renders FreeRADIUS client definitions from nas_devices.
+    # Shared volume with the freeradius container, which restarts radiusd
+    # when the file's checksum changes (radius/entrypoint.sh).
+    radius_clients_path: str = "/etc/freeradius-clients/nas.conf"
+
+    # --- Actuation (CoA / Disconnect toward the NAS fleet) ----------------
+    # Atlas doctrine: dry-run by default, change ceiling, panic switch.
+    actuation_dry_run: bool = True
+    actuation_max_per_minute: int = 120
+    coa_timeout_s: float = 2.0
+    coa_retries: int = 1
+    # Attributes a MikroTik applies mid-session via CoA. A change to anything
+    # else (Framed-Pool, Mikrotik-Group, Framed-IP-Address...) can only take
+    # effect on a new session, so it's actuated as Disconnect + reconnect.
+    # Add Mikrotik-Address-List here only after verifying it on your ROS
+    # builds with a test account.
+    coa_mutable_attributes: list[str] = ["Mikrotik-Rate-Limit", "Session-Timeout"]
+
+    # A session with no accounting packet for this long is treated as dead
+    # (lost Stop). Should be > 2x the NAS interim-update interval.
+    session_stale_after_s: int = 900
+
+    # Walled garden: the address list a router uses to redirect expired /
+    # exhausted subscribers to a portal page, plus the rate they get there.
+    walled_garden_address_list: str = "walled-garden"
+    walled_garden_rx_bps: int = 256_000
+    walled_garden_tx_bps: int = 256_000
+
+    auth_log_retention_days: int = 30
+    worker_tick_s: int = 15
+
 
 settings = Settings()

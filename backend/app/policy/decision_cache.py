@@ -11,7 +11,7 @@ that actually matters here (what happens on timeout).
 import asyncio
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Awaitable, Callable, Protocol
 
@@ -28,6 +28,9 @@ class AuthorizeDecision:
     accepted: bool
     reply_attributes: dict
     reason: str  # e.g. "ok", "gate:traffic", "cache:stale", "fail_mode:open", "fail_mode:closed"
+    # Human-readable trail of what shaped the decision ("daily FUP tier",
+    # "time window 17:00-02:00 active") — shown in the Atlas subscriber view.
+    explain: list = field(default_factory=list)
 
 
 class DecisionCache(Protocol):

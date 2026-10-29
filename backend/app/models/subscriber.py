@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
-from sqlalchemy.dialects.postgresql import INET, UUID
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String
+from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -40,6 +40,15 @@ class Subscriber(Base):
     static_ip: Mapped[str | None] = mapped_column(INET)
     mac_binding: Mapped[str | None] = mapped_column(String(17))  # absent on ~all legacy accounts
     concurrent_session_limit: Mapped[int | None] = mapped_column(Integer)  # overrides plan default
+
+    # Per-subscriber overrides on top of the profile. A rate override replaces
+    # the profile's base rate (FUP/time-of-day still apply on top unless
+    # exempted); custom attributes win over the profile's on the same name.
+    rx_limit_override_bps: Mapped[int | None] = mapped_column(BigInteger)
+    tx_limit_override_bps: Mapped[int | None] = mapped_column(BigInteger)
+    custom_attributes: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
+    exempt_time_of_day: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    exempt_fup: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
