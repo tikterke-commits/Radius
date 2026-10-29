@@ -1,0 +1,23 @@
+# Publishes the engine's admin API to Atlas — and nothing else. The rlm_rest
+# routes (/radius/*) are unauthenticated by design and only reachable from
+# the freeradius container over the compose network.
+#
+# ENGINE_API_SITE is the address Atlas dials, e.g. https://10.140.140.20:8443
+# (set it in .env). `tls internal` issues from Caddy's local CA; give Atlas
+# the root to trust:
+#   docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt
+{
+	auto_https disable_redirects
+}
+
+{$ENGINE_API_SITE} {
+	tls internal
+
+	@api path /api/v1/* /healthz
+	handle @api {
+		reverse_proxy backend:8000
+	}
+	handle {
+		respond "not found" 404
+	}
+}

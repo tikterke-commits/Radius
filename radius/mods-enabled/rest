@@ -7,6 +7,9 @@
 #   - JSON response keys need an explicit list prefix: "reply:Attribute-Name"
 # See backend/app/schemas/radius.py and backend/app/api/radius.py for the
 # Python side of this exact contract.
+#
+# NAS-IP-Address falls back to the packet source address: some RouterOS
+# builds omit it, and the backend keys sessions and CoA targets on it.
 
 rest {
 	connect_uri = "${env.RLM_REST_BASE_URL}"
@@ -25,7 +28,7 @@ rest {
 		uri = "${..connect_uri}/radius/authorize"
 		method = 'post'
 		body = 'json'
-		data = '{"username":"%{User-Name}","nas_ip_address":"%{NAS-IP-Address}","nas_port_id":"%{NAS-Port-Id}","calling_station_id":"%{Calling-Station-Id}"}'
+		data = '{"username":"%{User-Name}","nas_ip_address":"%{%{NAS-IP-Address}:-%{Packet-Src-IP-Address}}","nas_port_id":"%{NAS-Port-Id}","calling_station_id":"%{Calling-Station-Id}"}'
 		tls = ${..tls}
 	}
 
@@ -44,7 +47,9 @@ rest {
 		uri = "${..connect_uri}/radius/accounting"
 		method = 'post'
 		body = 'json'
-		data = '{"username":"%{User-Name}","acct_status_type":"%{Acct-Status-Type}","acct_session_id":"%{Acct-Session-Id}","nas_ip_address":"%{NAS-IP-Address}","acct_session_time":%{%{Acct-Session-Time}:-0},"acct_input_octets":%{%{Acct-Input-Octets}:-0},"acct_output_octets":%{%{Acct-Output-Octets}:-0},"acct_terminate_cause":"%{Acct-Terminate-Cause}"}'
+		# Gigawords carry the 32-bit wrap count of the octet counters — without
+		# them every session past 4 GiB silently stops being counted.
+		data = '{"username":"%{User-Name}","acct_status_type":"%{Acct-Status-Type}","acct_session_id":"%{Acct-Session-Id}","nas_ip_address":"%{%{NAS-IP-Address}:-%{Packet-Src-IP-Address}}","acct_session_time":%{%{Acct-Session-Time}:-0},"acct_input_octets":%{%{Acct-Input-Octets}:-0},"acct_output_octets":%{%{Acct-Output-Octets}:-0},"acct_input_gigawords":%{%{Acct-Input-Gigawords}:-0},"acct_output_gigawords":%{%{Acct-Output-Gigawords}:-0},"acct_terminate_cause":"%{Acct-Terminate-Cause}","framed_ip_address":"%{Framed-IP-Address}","calling_station_id":"%{Calling-Station-Id}","nas_port_id":"%{NAS-Port-Id}"}'
 		tls = ${..tls}
 	}
 
@@ -52,7 +57,9 @@ rest {
 		uri = "${..connect_uri}/radius/post-auth"
 		method = 'post'
 		body = 'json'
-		data = '{"username":"%{User-Name}","packet_type":"%{Packet-Type}","nas_ip_address":"%{NAS-IP-Address}"}'
+		# reply:Packet-Type is the answer (Access-Accept / Access-Reject);
+		# a bare %{Packet-Type} is the request, i.e. always Access-Request.
+		data = '{"username":"%{User-Name}","packet_type":"%{reply:Packet-Type}","nas_ip_address":"%{%{NAS-IP-Address}:-%{Packet-Src-IP-Address}}","calling_station_id":"%{Calling-Station-Id}","reply_message":"%{reply:Reply-Message}"}'
 		tls = ${..tls}
 	}
 }

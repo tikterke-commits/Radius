@@ -1,4 +1,3 @@
-version: "3.8"
 
 # Data Plus Lebanon ISP platform.
 # NOTE: this compose file is meant to be run on the actual deploy host
@@ -65,11 +64,17 @@ services:
     build: ./backend
     restart: unless-stopped
     env_file: .env
-    environment:
+    environment: &engine_env
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-radius}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:-radius_platform}
       REDIS_URL: redis://redis:6379/0
       CLICKHOUSE_URL: http://clickhouse:8123
       AUTHZ_FAIL_MODE: ${AUTHZ_FAIL_MODE:-closed}
+      RADIUS_CLIENTS_PATH: /etc/freeradius-clients/nas.conf
+    # Migrations run here, once, before the API takes traffic; the worker
+    # waits for this service to be healthy.
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    volumes:
+      - radius_clients:/etc/freeradius-clients
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,8 +82,25 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # Loopback only. /radius/* has no auth of its own — it's for the
+    # freeradius container. Atlas reaches /api/v1 through Caddy.
     ports:
       - "127.0.0.1:8000:8000"
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment: *engine_env
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      backend:
+        condition: service_healthy
 
   freeradius:
     build: ./radius
@@ -86,30 +108,32 @@ services:
     environment:
       RLM_REST_BASE_URL: http://backend:8000
     volumes:
-      # Bind-mounted for fast dev iteration; the Dockerfile also COPYs these
-      # so a plain `docker compose build` (no mounts) still produces a
-      # correctly configured image for non-compose deployment.
-      - ./radius/sites-enabled:/etc/freeradius/3.0/sites-enabled:ro
-      - ./radius/mods-enabled/rest:/etc/freeradius/3.0/mods-enabled/rest:ro
+      # Bind-mounted for fast iteration; the Dockerfile also COPYs these so a
+      # plain image build is complete on its own.
+      - ./radius/sites-enabled/default:/etc/raddb/sites-enabled/default:ro
+      - ./radius/mods-enabled/rest:/etc/raddb/mods-enabled/rest:ro
+      # NAS client list rendered by the backend from nas_devices.
+      - radius_clients:/etc/freeradius-clients:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "1812:1812/udp"
       - "1813:1813/udp"
-      # No CoA listener here: this server originates CoA/Disconnect-Requests
-      # toward the NAS fleet (RouterOS actuation layer, B4 — not yet built),
-      # it doesn't receive them, so there's no `listen { type = coa }` block
-      # and nothing needs port 3799 published on this service.
+      # CoA/Disconnect-Requests are *originated* by the backend/worker toward
+      # the NAS fleet (app/actuation/coa.py), so nothing listens on 3799 here.
+      # The NAS must list this host under /radius for CoA to be accepted.
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    environment:
+      ENGINE_API_SITE: ${ENGINE_API_SITE:-localhost:8443}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     ports:
-      - "80:80"
-      - "443:443"
+      - "8443:8443"
     depends_on:
       - backend
 
@@ -118,3 +142,4 @@ volumes:
   redis_data:
   clickhouse_data:
   caddy_data:
+  radius_clients:
