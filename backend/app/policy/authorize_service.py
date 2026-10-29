@@ -141,13 +141,20 @@ async def build_inputs(
     calling_station_id: str | None = None,
     check_concurrency: bool = True,
 ) -> PolicyInputs | AuthorizeDecision:
-    subscription = (
-        await db.execute(select(Subscription).where(Subscription.subscriber_id == subscriber.id))
-    ).scalar_one_or_none()
-    if subscription is None:
+    # One round trip for subscription + plan + both policies: authorize runs
+    # under a 40ms budget, and each extra query is a measurable slice of it.
+    row = (
+        await db.execute(
+            select(Subscription, Plan, DailyPolicy, TimeOfDayPolicy)
+            .outerjoin(Plan, Plan.id == Subscription.plan_id)
+            .outerjoin(DailyPolicy, DailyPolicy.id == Plan.daily_policy_id)
+            .outerjoin(TimeOfDayPolicy, TimeOfDayPolicy.id == Plan.time_of_day_policy_id)
+            .where(Subscription.subscriber_id == subscriber.id)
+        )
+    ).first()
+    if row is None:
         return AuthorizeDecision(accepted=False, reply_attributes={}, reason="no_active_subscription")
-
-    plan = (await db.execute(select(Plan).where(Plan.id == subscription.plan_id))).scalar_one_or_none()
+    subscription, plan, dp, policy = row
     if plan is None:
         return AuthorizeDecision(accepted=False, reply_attributes={}, reason="plan_not_found")
 
@@ -155,17 +162,8 @@ async def build_inputs(
         await db.execute(select(QuotaState).where(QuotaState.subscriber_id == subscriber.id))
     ).scalars().all()
 
-    daily = None
-    if plan.daily_policy_id is not None:
-        dp = (await db.execute(select(DailyPolicy).where(DailyPolicy.id == plan.daily_policy_id))).scalar_one_or_none()
-        daily = daily_policy_spec(dp) if dp else None
-
-    windows: tuple = ()
-    if plan.time_of_day_policy_id is not None:
-        policy = (
-            await db.execute(select(TimeOfDayPolicy).where(TimeOfDayPolicy.id == plan.time_of_day_policy_id))
-        ).scalar_one_or_none()
-        windows = tuple(parse_window(w) for w in (policy.windows if policy else []))
+    daily = daily_policy_spec(dp) if dp is not None else None
+    windows = tuple(parse_window(w) for w in (policy.windows if policy is not None else []))
 
     usage = await load_usage(db, subscriber.id, subscription.period_started_at or subscription.started_at, now)
 
@@ -213,3 +211,22 @@ async def compute_authorize_decision(
     if subscriber is None:
         return AuthorizeDecision(accepted=False, reply_attributes={}, reason="no_such_subscriber")
     return await decision_for_subscriber(db, subscriber, now, calling_station_id, check_concurrency=True)
+
+
+async def warm_up(db: AsyncSession) -> None:
+    """Run every authorize-path statement once with a throwaway id, so the
+    connection pool is open and SQLAlchemy's compiled-statement cache is hot
+    before the first real Access-Request. A cold first authorize takes ~35ms
+    of the 40ms budget — enough to fail-closed the first login after every
+    restart. Called from the app lifespan."""
+    import uuid as _uuid
+    from datetime import timezone as _tz
+
+    now = datetime.now(_tz.utc)
+    ghost = Subscriber(id=_uuid.uuid4(), username="__warmup__", enabled=True)
+    await db.execute(select(Subscriber).where(Subscriber.username == ghost.username))
+    await build_inputs(db, ghost, now, None, check_concurrency=True)
+    await db.execute(select(QuotaState).where(QuotaState.subscriber_id == ghost.id))
+    await load_usage(db, ghost.id, now, now)
+    await count_other_live_sessions(db, ghost.id, "00:00:00:00:00:00", now)
+    await db.rollback()

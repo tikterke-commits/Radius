@@ -9,7 +9,6 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -86,6 +85,11 @@ async def client(db_session, monkeypatch):
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    # httpx's ASGITransport doesn't run the app lifespan, so run the same
+    # warm-up production does at startup (app/main.py) — otherwise the first
+    # authorize in the run is a cold path that the 40ms budget isn't for.
+    from app.policy.authorize_service import warm_up
+    await warm_up(db_session)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

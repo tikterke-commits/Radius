@@ -1,0 +1,86 @@
+# RADIUS dictionary for the engine's own CoA / Disconnect client (pyrad).
+# FreeRADIUS uses its stock dictionaries; this file only has to cover what
+# the engine itself encodes into CoA-Request / Disconnect-Request and what
+# the admin API accepts as profile/subscriber custom attributes.
+
+ATTRIBUTE	User-Name			1	string
+ATTRIBUTE	User-Password			2	string
+ATTRIBUTE	NAS-IP-Address			4	ipaddr
+ATTRIBUTE	NAS-Port			5	integer
+ATTRIBUTE	Service-Type			6	integer
+ATTRIBUTE	Framed-Protocol			7	integer
+ATTRIBUTE	Framed-IP-Address		8	ipaddr
+ATTRIBUTE	Framed-IP-Netmask		9	ipaddr
+ATTRIBUTE	Filter-Id			11	string
+ATTRIBUTE	Framed-MTU			12	integer
+ATTRIBUTE	Reply-Message			18	string
+ATTRIBUTE	Framed-Route			22	string
+ATTRIBUTE	State				24	octets
+ATTRIBUTE	Class				25	octets
+ATTRIBUTE	Session-Timeout			27	integer
+ATTRIBUTE	Idle-Timeout			28	integer
+ATTRIBUTE	Called-Station-Id		30	string
+ATTRIBUTE	Calling-Station-Id		31	string
+ATTRIBUTE	NAS-Identifier			32	string
+ATTRIBUTE	Acct-Status-Type		40	integer
+ATTRIBUTE	Acct-Session-Id			44	string
+ATTRIBUTE	Acct-Terminate-Cause		49	integer
+ATTRIBUTE	Event-Timestamp			55	date
+ATTRIBUTE	Port-Limit			62	integer
+ATTRIBUTE	Message-Authenticator		80	octets
+ATTRIBUTE	Acct-Interim-Interval		85	integer
+ATTRIBUTE	NAS-Port-Id			87	string
+ATTRIBUTE	Framed-Pool			88	string
+ATTRIBUTE	Error-Cause			101	integer
+
+VALUE	Error-Cause	Residual-Context-Removed		201
+VALUE	Error-Cause	Invalid-EAP-Packet			202
+VALUE	Error-Cause	Unsupported-Attribute			401
+VALUE	Error-Cause	Missing-Attribute			402
+VALUE	Error-Cause	NAS-Identification-Mismatch		403
+VALUE	Error-Cause	Invalid-Request				404
+VALUE	Error-Cause	Unsupported-Service			405
+VALUE	Error-Cause	Unsupported-Extension			406
+VALUE	Error-Cause	Invalid-Attribute-Value			407
+VALUE	Error-Cause	Administratively-Prohibited		501
+VALUE	Error-Cause	Request-Not-Routable			502
+VALUE	Error-Cause	Session-Context-Not-Found		503
+VALUE	Error-Cause	Session-Context-Not-Removable		504
+VALUE	Error-Cause	Other-Proxy-Processing-Error		505
+VALUE	Error-Cause	Resources-Unavailable			506
+VALUE	Error-Cause	Request-Initiated			507
+
+VENDOR		Mikrotik			14988
+
+BEGIN-VENDOR	Mikrotik
+ATTRIBUTE	Mikrotik-Recv-Limit			1	integer
+ATTRIBUTE	Mikrotik-Xmit-Limit			2	integer
+ATTRIBUTE	Mikrotik-Group				3	string
+ATTRIBUTE	Mikrotik-Wireless-Forward		4	integer
+ATTRIBUTE	Mikrotik-Wireless-Skip-Dot1x		5	integer
+ATTRIBUTE	Mikrotik-Wireless-Enc-Algo		6	integer
+ATTRIBUTE	Mikrotik-Wireless-Enc-Key		7	string
+ATTRIBUTE	Mikrotik-Rate-Limit			8	string
+ATTRIBUTE	Mikrotik-Realm				9	string
+ATTRIBUTE	Mikrotik-Host-IP			10	ipaddr
+ATTRIBUTE	Mikrotik-Mark-Id			11	string
+ATTRIBUTE	Mikrotik-Advertise-URL			12	string
+ATTRIBUTE	Mikrotik-Advertise-Interval		13	integer
+ATTRIBUTE	Mikrotik-Recv-Limit-Gigawords		14	integer
+ATTRIBUTE	Mikrotik-Xmit-Limit-Gigawords		15	integer
+ATTRIBUTE	Mikrotik-Wireless-PSK			16	string
+ATTRIBUTE	Mikrotik-Total-Limit			17	integer
+ATTRIBUTE	Mikrotik-Total-Limit-Gigawords		18	integer
+ATTRIBUTE	Mikrotik-Address-List			19	string
+ATTRIBUTE	Mikrotik-Wireless-MPKey			20	string
+ATTRIBUTE	Mikrotik-Wireless-Comment		21	string
+ATTRIBUTE	Mikrotik-Delegated-IPv6-Pool		22	string
+ATTRIBUTE	Mikrotik-DHCP-Option-Set		23	string
+ATTRIBUTE	Mikrotik-DHCP-Option-Param-STR1		24	string
+ATTRIBUTE	Mikrotik-DHCP-Option-Param-STR2		25	string
+ATTRIBUTE	Mikrotik-Wireless-VLANID		26	integer
+ATTRIBUTE	Mikrotik-Wireless-VLANIDtype		27	integer
+ATTRIBUTE	Mikrotik-Wireless-Minsignal		28	string
+ATTRIBUTE	Mikrotik-Wireless-Maxsignal		29	string
+ATTRIBUTE	Mikrotik-Switching-Filter		30	string
+END-VENDOR	Mikrotik
