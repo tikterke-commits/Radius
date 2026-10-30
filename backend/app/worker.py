@@ -230,6 +230,12 @@ async def run_tick(session_factory, redis, sender: CoASender, now: datetime | No
     return out
 
 
+def _did_something(summary: dict) -> bool:
+    def nonzero(v) -> bool:
+        return any(nonzero(x) for x in v.values()) if isinstance(v, dict) else bool(v)
+    return nonzero(summary)
+
+
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     redis = get_redis()
@@ -243,7 +249,7 @@ async def main() -> None:
             await redis.expire(LOCK_KEY, lock_ttl)
             try:
                 summary = await run_tick(SessionLocal, redis, sender)
-                if any(v for k, v in summary.items() if k != "reconcile") or summary["reconcile"]["subscribers"]:
+                if _did_something(summary):
                     logger.info("tick %s", summary)
             except Exception:
                 logger.exception("tick failed")

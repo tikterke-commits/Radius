@@ -59,7 +59,14 @@ accounting {
 }
 
 post-auth {
-	rest
+	# Auth-log write only. A backend hiccup here must never turn an
+	# Access-Accept into a reject, so a failed call is downgraded to ok.
+	rest {
+		fail = 1
+	}
+	if (fail) {
+		ok
+	}
 	Post-Auth-Type REJECT {
 		rest
 	}

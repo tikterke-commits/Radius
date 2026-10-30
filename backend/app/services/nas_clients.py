@@ -66,7 +66,9 @@ async def write_clients_file(db: AsyncSession, path: str | None = None) -> dict:
         fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=".nas.", suffix=".tmp")
         with os.fdopen(fd, "w") as fh:
             fh.write(content)
-        os.chmod(tmp, 0o640)
+        # World-readable inside the volume: radiusd may parse it as a
+        # non-root user, and only the backend + freeradius mount this volume.
+        os.chmod(tmp, 0o644)
         os.replace(tmp, target)
         written = True
         error = None

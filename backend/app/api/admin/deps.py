@@ -43,9 +43,11 @@ async def _default_tenant(db: AsyncSession) -> uuid.UUID:
         _tenant_cache.pop(name, None)
     tenant = (await db.execute(select(Tenant).where(Tenant.name == name, Tenant.parent_tenant_id.is_(None)))).scalars().first()
     if tenant is None:
+        # Committed on its own: the first request may be a read-only GET
+        # that never commits, which would roll the tenant back every time.
         tenant = Tenant(name=name)
         db.add(tenant)
-        await db.flush()
+        await db.commit()
     _tenant_cache[name] = tenant.id
     return tenant.id
 
